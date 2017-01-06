@@ -1,0 +1,14 @@
+#!/usr/bin/env python2.7
+
+import happy.logger
+import happy.parser
+import happy.runner
+
+# compatibility for pickle.load() from hdfs_sync.py index
+from happy.sync_file import SyncFile
+
+if __name__ == '__main__':
+    args = happy.parser.parse_args()
+
+    happy.logger.setup_logger(args.log_conf)
+    happy.runner.setup_runner(args)

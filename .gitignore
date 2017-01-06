@@ -1,0 +1,5 @@
+*.sw*
+*.pyc
+debian/files
+debian/happy*
+*.egg-info/
