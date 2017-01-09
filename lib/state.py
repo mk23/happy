@@ -5,14 +5,12 @@ import logging
 import os
 import pickle
 import shutil
+import yaml
 
 LOG = logging.getLogger()
 
 
 def setup_local(index, mirror, unpack):
-#    import sys
-#    setattr(sys.modules['__main__'], 'SyncFile', happy.sync_file.SyncFile)
-
     local = {}
 
     LOG.debug('reading local index: %s', index)
@@ -64,6 +62,33 @@ def setup_avail(client, source, filter, mirror, unpack):
 
     LOG.info('read remote list containing %d items', len(avail))
     return avail
+
+
+def setup_check(config):
+    check = {}
+
+    LOG.debug('looking for dataset configs in %s', config)
+    for path, paths, files in os.walk(config or os.devnull):
+        for name in files:
+            full = '%s/%s' % (path, name)
+            if fnmatch.fnmatch(full, '*_dataset.y*ml'):
+                try:
+                    data = yaml.load(open(full))
+                    if data['hdfs_path'] not in check:
+                        check[data['hdfs_path']] = []
+
+                    if isinstance(data['setup_cmd'], (tuple, list)):
+                        check[data['hdfs_path']].extend(data['setup_cmd'])
+                    else:
+                        check[data['hdfs_path']].append(data['setup_cmd'])
+
+                    LOG.info('loaded dataset configuration from %s', full)
+                except KeyError as e:
+                    happy.log_error(e, '%s: missing required field' % full)
+                except (IOError, yaml.parser.ParserError, yaml.scanner.ScannerError) as e:
+                    happy.log_error(e, '%s: failed to load dataset configuration' % full)
+
+    return check
 
 
 def clean_local(index, local, mirror, unpack, skip=False):

@@ -64,30 +64,37 @@ def setup_runner(args):
         index = os.path.normpath('%s/%s' % (dest_dir, os.path.basename(args.manifest)))
         local = happy.state.setup_local(index, sync_dir, arch_dir)
         avail = happy.state.setup_avail(hdfs_api, hdfs_dir, includes, sync_dir, arch_dir)
+        check = happy.state.setup_check(args.conf_dir)
         procs = multiprocessing.pool.ThreadPool(processes=args.workers)
         xfers = {}
 
         for key, val in avail.items():
             if (key not in local or not val.equal(local[key])):
                 xfers[key] = procs.apply_async(val.fetch, (hdfs_api, temp_dir, args.dry_run))
+
+        procs.close()
+        procs.join()
+
         for key, val in xfers.items():
             if val.get():
                 local[key] = avail[key]
             else:
                 LOG.err('failed to fetch %s', key)
+
         for key, val in local.items():
             if key not in avail and val.purge(args.dry_run):
                 del(local[key])
 
-#        for key, val in local.items():
-#            if os.path.basename(val.fullname) == args.manifest:
-#                val.check(os.stat(index).st_mtime if os.path.exists(index) else time.mktime(datetime.datetime.min.timetuple()), args.dry_run)
+        for key, val in local.items():
+            if val.remote.full in check:
+                val.check(check[val.remote.full], os.stat(index).st_mtime if os.path.exists(index) else time.mktime(datetime.datetime.min.timetuple()), args.dry_run)
 
         if not args.dry_run:
             pickle.dump(local, open(index, 'w'))
             LOG.info('saved %d items to index: %s', len(local), index)
 
         happy.state.clean_local(index, local, sync_dir, arch_dir, args.dry_run)
+
         LOG.info('execution completed in %ds', (datetime.datetime.now() - start_ts).total_seconds())
     except Exception as e:
         happy.log_error(e)

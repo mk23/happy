@@ -3,6 +3,7 @@ import logging
 import happy
 import json
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -165,7 +166,7 @@ class SyncFile(object):
                 except Exception as e:
                     happy.log_error(e)
 
-    def check(self, last, skip=False):
+    def check(self, cmds, last, skip=False):
         if skip:
             LOG.info('processing dataset manifest: %s', self.fullname)
 
@@ -208,10 +209,13 @@ class SyncFile(object):
                 return True
 
             os.chdir(os.path.dirname(self.fullname))
-            subprocess.check_call([data['script'], self.fullname])
-# FIXME: do something when command fails to allow retries
-
-            LOG.info('  executed dataset manifest command: %s %s', data['script'], self.fullname)
+            for item in cmds:
+                try:
+                    subprocess.check_call([item, self.fullname])
+                    LOG.info('  executed dataset manifest command: %s %s', item, self.fullname)
+                except (AttributeError, TypeError, subprocess.CalledProcessError) as e:
+                    # FIXME: do something when command fails to allow retries
+                    happy.log_error(e)
             return True
         except Exception as e:
             happy.log_error(e)
