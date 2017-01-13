@@ -1,6 +1,6 @@
 import errno
 import fnmatch
-import happy.sync_file
+import happy.syncer
 import logging
 import os
 import pickle
@@ -53,7 +53,7 @@ def setup_avail(client, source, filter, mirror, unpack):
             for find in filter:
                 if fnmatch.fnmatch(item.full[len(source) + 1:], find):
                     LOG.info('queueing hdfs object: %s', item.full)
-                    avail[item.full] = happy.sync_file.SyncFile(item, source, mirror, unpack)
+                    avail[item.full] = happy.syncer.SyncFile(item, source, mirror, unpack)
                     break
             else:
                 LOG.debug('skipping excluded hdfs object: %s', item.full)

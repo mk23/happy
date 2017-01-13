@@ -1,9 +1,8 @@
 import errno
+import happy.parser
 import logging
-import happy
-import json
 import os
-import shlex
+import re
 import shutil
 import stat
 import subprocess
@@ -169,10 +168,11 @@ class SyncFile(object):
     def check(self, cmds, last, skip=False):
         if skip:
             LOG.info('processing dataset manifest: %s', self.fullname)
+            return True
 
         try:
-            data = json.load(open(self.fullname))
-            LOG.info('processing %d items from manifest: %s', len(data['files']), self.fullname)
+            data = happy.parser.parse(self.fullname)
+            LOG.info('processing %d items from manifest: %s', len(data), self.fullname)
 
             for path, paths, files in os.walk(os.path.dirname(self.fullname)):
                 for name in files:
@@ -183,27 +183,27 @@ class SyncFile(object):
                     if full == self.fullname or stat.S_ISLNK(info.st_mode):
                         continue
 
-                    if part not in data['files']:
+                    if part not in data:
                         LOG.warning('  file not found in manifest, skipping: %s', full)
                     else:
-                        data['files'][part]['stat'] = os.stat(full)
+                        data[part]['stat'] = os.stat(full)
 
 
-            find = list(i for i, j in data['files'].items() if 'stat' not in j)
+            find = list(i for i, j in data.items() if 'stat' not in j)
             if find:
                 LOG.warning('  manifest is missing %d file(s), aborting:', len(find))
                 for item in find:
                     LOG.warning('    %s', item)
                 return False
 
-            find = list(i for i, j in data['files'].items() if j['size'] != j['stat'].st_size)
+            find = list(i for i, j in data.items() if j['size'] != j['stat'].st_size)
             if find:
                 LOG.warning('  manifest has %d invalid file(s), aborting:', len(find))
                 for item in find:
-                    LOG.warning('    %s (expected: %d bytes, observed: %d bytes)', item, data['files'][item]['size'], data['files'][item]['stat'].st_size)
+                    LOG.warning('    %s (expected: %d bytes, observed: %d bytes)', item, data[item]['size'], data[item]['stat'].st_size)
                 return False
 
-            find = list(i for i, j in data['files'].items() if j['stat'].st_mtime > last)
+            find = list(i for i, j in data.items() if j['stat'].st_mtime > last)
             if not find and os.stat(self.fullname).st_mtime < last:
                 LOG.info( '  manifest has no updates, skipping')
                 return True
